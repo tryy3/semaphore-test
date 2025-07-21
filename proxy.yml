@@ -5,12 +5,9 @@
     git_repo: https://github.com/tryy3/proxy.git
     git_branch: main
     proxy_dir: /opt/proxy
-  tasks:
-    - name: Update apt cache
-      ansible.builtin.apt:
-        update_cache: true
-    
+  tasks:    
     - name: Install Podman
+      become: yes
       ansible.builtin.apt:
         name:
           - podman
@@ -19,10 +16,13 @@
         state: present
 
     - name: Create application directory
+      become: yes
       ansible.builtin.file:
         path: "{{ proxy_dir }}"
         state: directory
         mode: '0755'
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
 
     - name: Copy the proxy Docker Compose file
       ansible.builtin.git:
