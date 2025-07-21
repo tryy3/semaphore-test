@@ -10,5 +10,7 @@
     tailscale_auth_key: "{{ tailscale_auth_key }}"
     tailscale_hostname: "{{ ansible_hostname }}"
     tailscale_accept_routes: true
+    tailscale_oauth_ephemeral: false
+    tailscale_oauth_preauthorized: true
   roles:
    - artis3n.tailscale.machine
