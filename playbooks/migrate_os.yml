@@ -1,0 +1,237 @@
+---
+- name: Migrate OS from vdb to vda
+  hosts: setup_vm
+  become: yes
+  vars:
+    source_disk: /dev/vdb
+    target_disk: /dev/vda
+    target_root_mount: /mnt/target_root
+    efi_partition_size: 512MiB # Standard size for EFI partition
+  tasks:
+    # You can use the 'lsblk' command to confirm that vdb = is the temporary OS disk
+    # Meanwhile vda is the newly created disk, generally the one that is 500gb
+    - name: PAUSE - Confirm destructive actions
+      ansible.builtin.pause:
+        prompt: |
+          ---> WARNING <----
+          This playbook is about to perform DESTRUCTIVE actions on disk '{{ target_disk }}' on host '{{ inventory_hostname }}'.
+
+          It will attempt to:
+            1. REMOVE ALL existing partitions on {{ target_disk }}.
+            2. CREATE new EFI and Root partitions on {{ target_disk }}.
+            3. FORMAT these new partitions (erasing data).
+            4. COPY the OS from {{ source_disk }} to {{ target_disk }}.
+            5. INSTALL a bootloader on {{ target_disk }}.
+
+          Ensure '{{ target_disk }}' is the correct disk you intend to overwrite!
+
+          Type exactly 'yes' to proceed, or press Ctrl+C then 'a' to abort.
+      register: user_confirmation
+      # Only run this task if skip_confirmation is not defined or is false
+      when: not (skip_confirmation | default(false) | bool)
+      # Fail the playbook if the user input is not exactly 'yes' (case-insensitive)
+      failed_when: user_confirmation.user_input | lower != 'yes'
+
+    - name: Ensure necessary tools are installed on target
+      apt:
+        name:
+          - parted
+          - dosfstools # For mkfs.vfat (EFI partition)
+          - rsync
+          - gdisk # Often used by parted module, good to have
+          - grub-efi-amd64 # GRUB package for EFI systems
+        state: present
+        update_cache: yes
+
+    - name: Gather mount facts
+      ansible.builtin.mount_facts:
+
+    - name: Unmount any existing mounts on target disk devices
+      ansible.builtin.mount:
+        path: "{{ item.mount }}"
+        state: unmounted
+      # Filter mounts by target disk device, then sort by mount path length descending
+      loop: "{{ ansible_mounts | selectattr('device', 'match', '^' + target_disk + '.*') | sort(attribute='mount', reverse=True) | list }}"
+      # Example filter: selects mounts where device starts with /dev/vda
+      ignore_errors: yes # Important if a parent mount gets unmounted first or if already unmounted
+
+    - name: Read device information (always use unit when probing)
+      community.general.parted: device="{{ target_disk }}" unit=MiB
+      register: target_disk_info
+
+    - name: Remove all partitions from disk
+      community.general.parted:
+        device: "{{ target_disk }}"
+        number: '{{ item.num }}'
+        state: absent
+      loop: '{{ target_disk_info.partitions }}'
+
+    - name: Create EFI System Partition (ESP) on target disk
+      community.general.parted:
+        device: "{{ target_disk }}"
+        number: 1
+        part_end: "{{ efi_partition_size }}"
+        flags: [ boot, esp ]
+        state: present
+
+    - name: Create Root Partition on target disk
+      community.general.parted:
+        device: "{{ target_disk }}"
+        number: 3
+        part_start: "{{ efi_partition_size }}"
+        part_end: 100% # Use remaining space
+        state: present
+
+    - name: Format EFI partition as FAT32
+      ansible.builtin.filesystem:
+        fstype: vfat
+        dev: "{{ target_disk }}1" # Corresponds to number 1 above
+        force: yes
+
+    - name: Format Root partition as ext4
+      ansible.builtin.filesystem:
+        fstype: ext4
+        dev: "{{ target_disk }}2" # Corresponds to number 2 above
+        force: yes
+
+    - name: Create mount point for target root filesystem
+      ansible.builtin.file:
+        path: "{{ target_root_mount }}"
+        state: directory
+        mode: '0755'
+        owner: root
+        group: root
+
+    - name: Mount target root filesystem
+      ansible.builtin.mount:
+        path: "{{ target_root_mount }}"
+        src: "{{ target_disk }}2"
+        fstype: ext4
+        state: mounted
+
+    - name: Create mount point for target EFI partition
+      ansible.builtin.file:
+        path: "{{ target_root_mount }}/boot/efi"
+        state: directory
+        mode: '0755'
+
+    - name: Mount target EFI partition
+      ansible.builtin.mount:
+        path: "{{ target_root_mount }}/boot/efi"
+        src: "{{ target_disk }}1"
+        fstype: vfat
+        opts: "defaults,umask=0077" # Typical EFI mount options
+        state: mounted
+
+    # - name: Sync OS files from source root to target root
+    #   ansible.builtin.synchronize:
+    #     mode: pull # Pull from the remote host's root directory
+    #     src: / # Source is the running root ON THE TARGET VM
+    #     dest: "{{ target_root_mount }}/"
+    #     archive: yes
+    #     delete: yes # Delete files on dest not on src
+    #     rsync_opts:
+    #       - "--exclude=/dev/*"
+    #       - "--exclude=/proc/*"
+    #       - "--exclude=/sys/*"
+    #       - "--exclude=/tmp/*"
+    #       - "--exclude=/run/*"
+    #       - "--exclude=/mnt/*"
+    #       - "--exclude=/media/*"
+    #       - "--exclude=/lost+found"
+    #       # Exclude the source EFI mount if it exists to avoid recursion,
+    #       # we rely on the mount above to handle the target EFI contents
+    #       - "--exclude=/boot/efi/*"
+    #   become: yes # Explicitly enable become for this task
+
+    - name: Sync OS files using direct rsync command
+      ansible.builtin.command:
+        cmd: >
+          rsync -aAX --delete
+          --exclude=/dev/*
+          --exclude=/proc/*
+          --exclude=/sys/*
+          --exclude=/tmp/*
+          --exclude=/run/*
+          --exclude=/mnt/*
+          --exclude=/media/*
+          --exclude=/lost+found
+          --exclude={{ target_root_mount }}/*
+          / {{ target_root_mount }}/
+      become: yes
+      changed_when: true # Assume rsync always makes changes for simplicity
+
+    - name: Get UUID of the new target root partition
+      ansible.builtin.command: blkid -s UUID -o value {{ target_disk }}2
+      register: target_root_uuid_cmd
+      changed_when: false
+
+    - name: Get UUID of the new target EFI partition
+      ansible.builtin.command: blkid -s UUID -o value {{ target_disk }}1
+      register: target_efi_uuid_cmd
+      changed_when: false
+
+    - name: Define target UUIDs
+      set_fact:
+        target_root_uuid: "{{ target_root_uuid_cmd.stdout }}"
+        target_efi_uuid: "{{ target_efi_uuid_cmd.stdout }}"
+
+    - name: Update /etc/fstab on target root filesystem
+      ansible.builtin.template:
+        src: templates/fstab.j2 # We need to create this template file
+        dest: "{{ target_root_mount }}/etc/fstab"
+      vars:
+        root_uuid: "{{ target_root_uuid }}"
+        efi_uuid: "{{ target_efi_uuid }}"
+
+    - name: Mount necessary filesystems for chroot
+      ansible.builtin.command:
+        cmd: "mount --bind {{ item.src }} {{ target_root_mount }}{{ item.dest }}"
+      loop:
+        - { src: "/dev", dest: "/dev" }
+        - { src: "/proc", dest: "/proc" }
+        - { src: "/sys", dest: "/sys" }
+
+    - name: Install GRUB bootloader in chroot
+      ansible.builtin.command: >
+        chroot {{ target_root_mount }} /bin/bash -c
+        "grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=ubuntu --recheck {{ target_disk }}"
+
+    - name: Update GRUB configuration in chroot
+      ansible.builtin.command:
+        chroot {{ target_root_mount }} update-grub
+
+    - name: Unmount chroot filesystems
+      ansible.builtin.command:
+        cmd: "umount {{ target_root_mount }}{{ item.dest }}"
+      loop:
+        - { dest: "/dev" }
+        - { dest: "/proc" }
+        - { dest: "/sys" }
+      ignore_errors: yes # Ignore if already unmounted
+
+    - name: Unmount target EFI partition
+      ansible.builtin.mount:
+        path: "{{ target_root_mount }}/boot/efi"
+        state: unmounted
+
+    - name: Unmount target root filesystem
+      ansible.builtin.mount:
+        path: "{{ target_root_mount }}"
+        state: unmounted
+
+    - name: Add cloud-init disable flag on target (optional)
+      ansible.builtin.file:
+        path: "{{ target_root_mount }}/etc/cloud/cloud-init.disabled" # Mount target again briefly
+        state: touch
+        mode: '0644'
+      when: false # Set to true if you want to disable cloud-init on the new disk
+
+    - name: Final instructions
+      ansible.builtin.debug:
+        msg:
+          - "OS Migration appears complete."
+          - "ACTION REQUIRED: Shut down this VM NOW."
+          - "ACTION REQUIRED: In Unraid, change the VM's primary boot disk to the larger disk ({{ target_disk }})."
+          - "ACTION REQUIRED: Remove the cloud-init ISO from the virtual CD/DVD drive."
+          - "Then, start the VM. It should boot from the new disk." 
