@@ -1,0 +1,5 @@
+---
+- name: Perform a system maintence
+  hosts: all
+  roles:
+    - system_update
