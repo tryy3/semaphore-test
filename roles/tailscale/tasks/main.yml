@@ -1,12 +1,22 @@
-- name: Install tailscale
-  hosts: all
-  vars:
-    tailscale_authkey: "{{ tailscale_authkey }}"
-    tailscale_hostname: "{{ ansible_hostname }}"
-    tailscale_accept_routes: true
-    tailscale_oauth_ephemeral: false
-    tailscale_oauth_preauthorized: true
-    tailscale_tags:
-      - "ansible"
-  roles:
-   - artis3n.tailscale.machine
+---
+- name: Attempt to install tailscale
+  block:
+    - name: Install tailscale
+      include_role:
+        name: artis3n.tailscale.machine
+
+  rescue:
+    - name: Check if error is permission related
+      fail:
+        msg: "Non-permission error detected: {{ ansible_failed_result.msg[0] }}"
+      when: "'calling actor does not have enough permissions' not in ansible_failed_result.msg[0]"
+
+    - name: Set tailscale operator
+      become: yes
+      shell: tailscale set --operator={{ ansible_user }}
+      register: permission_fix_result
+      changed_when: permission_fix_result.rc == 0
+
+    - name: Attempt a retry tailscale installation
+      include_role:
+        name: artis3n.tailscale.machine

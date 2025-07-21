@@ -14,5 +14,6 @@
     tailscale_oauth_preauthorized: true
     tailscale_tags:
       - "ansible"
+    insecurely_log_authkey: true
   roles:
-   - artis3n.tailscale.machine
+   - tailscale
