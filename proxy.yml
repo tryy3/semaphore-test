@@ -15,16 +15,74 @@
           - git
         state: present
 
-    - name: Create application directory
+    - name: Ensure sysctl config file exists with correct content
       become: yes
+      ansible.builtin.lineinfile:
+        path: /etc/sysctl.d/10-unprivileged-ports.conf
+        line: "net.ipv4.ip_unprivileged_port_start=80"
+        create: yes
+        state: present
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Apply sysctl configurations
+      become: yes
+      ansible.builtin.command: sysctl -p /etc/sysctl.d/10-unprivileged-ports.conf
+      changed_when: false
+
+    - name: Apply sysctl configurations
+      become: yes
+      ansible.builtin.command: loginctl enable-linger {{ ansible_user }}
+      changed_when: false
+        
+    - name: Create systemd user directory
       ansible.builtin.file:
-        path: "{{ proxy_dir }}"
+        path: "{{ ansible_env.HOME }}/.config/containers/systemd"
         state: directory
         mode: '0755'
         owner: "{{ ansible_user }}"
         group: "{{ ansible_user }}"
 
-    - name: Copy the proxy Docker Compose file
+    - name: Create application directory
+      ansible.builtin.file:
+        path: "{{ ansible_env.HOME }}/containers/traefik"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+
+    - name: Create a temporary directory
+      ansible.builtin.tempfile:
+        state: directory
+        prefix: proxy_
+      register: temp_dir
+
+    - name: Clone the proxy repository
       ansible.builtin.git:
         repo: "{{ git_repo }}"
-        dest: "{{ proxy_dir }}"
+        dest: "{{ temp_dir.path }}"
+        force: yes
+
+    - name: Copy the traefik config file
+      ansible.builtin.copy:
+        remote_src: yes
+        src: "{{ temp_dir.path }}/config/"
+        dest: "{{ ansible_env.HOME }}/containers/traefik/"
+
+    - name: Copy all the systemd files
+      ansible.builtin.copy:
+        remote_src: yes
+        src: "{{ temp_dir.path }}/systemd/"
+        dest: "{{ ansible_env.HOME }}/.config/containers/systemd/"
+    
+    - name: Remove the temporary directory
+      ansible.builtin.file:
+        path: "{{ temp_dir.path }}"
+        state: absent
+
+    - name: Reload user systemd services
+      ansible.builtin.command: systemctl --user daemon-reload
+
+    - name: Start the traefik container
+      ansible.builtin.command: systemctl --user restart traefik.service
