@@ -1,13 +1,31 @@
 ---
 - name: Test
   hosts: setup_vm
+  vars:
+    test1: "Hello, World!"
+    foo: "bar"
   tasks:
-    - name: Ping site
-      ansible.builtin.command:
-        cmd: >
-          ping -c 1 -t 2 semaphoreui.com
+    # - name: Ping site
+    #   ansible.builtin.command:
+    #     cmd: >
+    #       ping -c 1 -t 2 semaphoreui.com
     
     - name: Ping test
-      ansible.builtin.command:
-        cmd: >
-          echo "{{ test }}"
+      debug:
+        msg: "Testing {{ test1 }}"
+    # You can use the 'lsblk' command to confirm that vdb = is the temporary OS disk
+    # Meanwhile vda is the newly created disk, generally the one that is 500gb
+    - name: PAUSE - Confirm destructive actions
+      ansible.builtin.pause:
+        prompt: |
+          ---> WARNING <----
+          This playbook is about to perform DESTRUCTIVE actions
+      register: user_confirmation
+      # Only run this task if skip_confirmation is not defined or is false
+      when: not (skip_confirmation | default(false) | bool)
+      # Fail the playbook if the user input is not exactly 'yes' (case-insensitive)
+      failed_when: user_confirmation.user_input | lower != 'yes'
+
+    - name: survey?
+      debug:
+        msg: "Hellos? {{ foo }}"
