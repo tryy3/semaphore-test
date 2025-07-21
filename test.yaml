@@ -1,14 +1,8 @@
 ---
-- name: Ping site
-  shell: |
-    if [[ "$(uname)" == "Darwin" ]]; then
-      ping -c 1 -t 2 semaphoreui.com
-    else
-      ping -c 1 -w 2 semaphoreui.com
-    fi
-  register: ping_result
-
-
-- name: Ping result
-  debug:
-    msg: "{{ ping_result.stdout_lines }}"
+- name: Test
+  hosts: setup_vm
+  tasks:
+    - name: Ping site
+      ansible.builtin.command: |
+        cmd: >
+          ping -c 1 -t 2 semaphoreui.com
