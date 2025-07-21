@@ -1,0 +1,30 @@
+---
+- name: Setup the proxy server
+  hosts: proxy-server
+  vars:
+    git_repo: https://github.com/tryy3/proxy.git
+    git_branch: main
+    proxy_dir: /opt/proxy
+  tasks:
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+    
+    - name: Install Podman
+      ansible.builtin.apt:
+        name:
+          - podman
+          - podman-compose
+          - git
+        state: present
+
+    - name: Create application directory
+      ansible.builtin.file:
+        path: "{{ proxy_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Copy the proxy Docker Compose file
+      ansible.builtin.git:
+        repo: "{{ git_repo }}"
+        dest: "{{ proxy_dir }}"
