@@ -10,27 +10,27 @@
   tasks:
     # You can use the 'lsblk' command to confirm that vdb = is the temporary OS disk
     # Meanwhile vda is the newly created disk, generally the one that is 500gb
-    - name: PAUSE - Confirm destructive actions
-      ansible.builtin.pause:
-        prompt: |
-          ---> WARNING <----
-          This playbook is about to perform DESTRUCTIVE actions on disk '{{ target_disk }}' on host '{{ inventory_hostname }}'.
+    # - name: PAUSE - Confirm destructive actions
+    #   ansible.builtin.pause:
+    #     prompt: |
+    #       ---> WARNING <----
+    #       This playbook is about to perform DESTRUCTIVE actions on disk '{{ target_disk }}' on host '{{ inventory_hostname }}'.
 
-          It will attempt to:
-            1. REMOVE ALL existing partitions on {{ target_disk }}.
-            2. CREATE new EFI and Root partitions on {{ target_disk }}.
-            3. FORMAT these new partitions (erasing data).
-            4. COPY the OS from {{ source_disk }} to {{ target_disk }}.
-            5. INSTALL a bootloader on {{ target_disk }}.
+    #       It will attempt to:
+    #         1. REMOVE ALL existing partitions on {{ target_disk }}.
+    #         2. CREATE new EFI and Root partitions on {{ target_disk }}.
+    #         3. FORMAT these new partitions (erasing data).
+    #         4. COPY the OS from {{ source_disk }} to {{ target_disk }}.
+    #         5. INSTALL a bootloader on {{ target_disk }}.
 
-          Ensure '{{ target_disk }}' is the correct disk you intend to overwrite!
+    #       Ensure '{{ target_disk }}' is the correct disk you intend to overwrite!
 
-          Type exactly 'yes' to proceed, or press Ctrl+C then 'a' to abort.
-      register: user_confirmation
-      # Only run this task if skip_confirmation is not defined or is false
-      when: not (skip_confirmation | default(false) | bool)
-      # Fail the playbook if the user input is not exactly 'yes' (case-insensitive)
-      failed_when: user_confirmation.user_input | lower != 'yes'
+    #       Type exactly 'yes' to proceed, or press Ctrl+C then 'a' to abort.
+    #   register: user_confirmation
+    #   # Only run this task if skip_confirmation is not defined or is false
+    #   when: not (skip_confirmation | default(false) | bool)
+    #   # Fail the playbook if the user input is not exactly 'yes' (case-insensitive)
+    #   failed_when: user_confirmation.user_input | lower != 'yes'
 
     - name: Ensure necessary tools are installed on target
       apt:
