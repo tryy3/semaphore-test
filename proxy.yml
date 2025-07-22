@@ -64,6 +64,11 @@
         dest: "{{ temp_dir.path }}"
         force: yes
 
+    - name: Clear out the existing config directory
+      ansible.builtin.file:
+        path: "{{ ansible_env.HOME }}/containers/traefik/"
+        state: absent
+
     - name: Copy the traefik config file
       ansible.builtin.copy:
         remote_src: yes
