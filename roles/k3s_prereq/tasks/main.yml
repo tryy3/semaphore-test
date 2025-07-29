@@ -1,0 +1,10 @@
+---
+- name: Gather tailscale facts
+  ansible.builtin.setup:
+    gather_subset:
+      - network
+
+- name: Get Tailscale IP address
+  ansible.builtin.set_fact:
+    tailscale_ip: "{{ ansible_tailscale0.ipv4.address | default('') }}"
+  when: ansible_tailscale0 is defined

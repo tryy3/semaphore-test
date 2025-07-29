@@ -1,0 +1,13 @@
+---
+- name: Gather k3s prereqs
+  hosts: k3s_agent
+  become: true
+  roles:
+    - k3s_prereq
+
+- name: Perform a install of k3s-agent
+  hosts: k3s_agent
+  become: true
+  roles:
+    - k3s_agent_installation
+    
