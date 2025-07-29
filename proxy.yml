@@ -12,6 +12,7 @@
         name:
           - podman
           - podman-compose
+          - podman-docker
           - git
         state: present
 

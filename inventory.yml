@@ -1,0 +1,23 @@
+all:
+  hosts:
+    proxy-server:
+      ansible_host: 192.168.1.10
+      ansible_hostname: proxy-server
+      ansible_user: tryy3
+    VM-KUBE-AGENT-01:
+      ansible_host: 192.168.1.11
+      ansible_hostname: VM-KUBE-AGENT-01
+      ansible_user: tryy3
+    
+
+setup_vm:
+  #hosts: 
+
+k3s_cluster:
+  children:
+    server:
+      #hosts: []
+
+    agent:
+      hosts:
+        VM-KUBE-AGENT-01
