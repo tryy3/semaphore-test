@@ -2,7 +2,7 @@
 - name: Setup the proxy server
   hosts: proxy-server
   vars:
-    git_repo: https://github.com/tryy3/proxy.git
+    git_repo: ssh://gitea.tryy3.dev:222/tryy3/proxy-compose.git
     git_branch: main
     proxy_dir: /opt/proxy
   tasks:    
