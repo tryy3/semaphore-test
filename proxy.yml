@@ -16,7 +16,7 @@
           - git
         state: present
 
-    - name: Ensure sysctl config file exists with correct content
+    - name: Ensure sysctl config file exists with unprivileged ports
       become: yes
       ansible.builtin.lineinfile:
         path: /etc/sysctl.d/10-unprivileged-ports.conf
@@ -27,9 +27,25 @@
         group: root
         mode: '0644'
 
-    - name: Apply sysctl configurations
+    - name: Apply sysctl unprivileged ports
       become: yes
       ansible.builtin.command: sysctl -p /etc/sysctl.d/10-unprivileged-ports.conf
+      changed_when: false
+
+    - name: Ensure sysctl config file exists with overcommit memory
+      become: yes
+      ansible.builtin.lineinfile:
+        path: /etc/sysctl.d/10-overcommit-memory.conf
+        line: "vm.overcommit_memory=1"
+        create: yes
+        state: present
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Apply sysctl overcommit memory
+      become: yes
+      ansible.builtin.command: sysctl -p /etc/sysctl.d/10-overcommit-memory.conf
       changed_when: false
 
     - name: Apply sysctl configurations
@@ -92,3 +108,12 @@
 
     - name: Start the traefik container
       ansible.builtin.command: systemctl --user restart traefik.service
+
+    - name: Start the Auth Redis container
+      ansible.builtin.command: systemctl --user restart auth-redis.service
+
+    - name: Start the Auth Server container
+      ansible.builtin.command: systemctl --user restart auth-server.service
+
+    - name: Start the Auth Worker container
+      ansible.builtin.command: systemctl --user restart auth-worker.service
