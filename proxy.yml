@@ -92,3 +92,12 @@
 
     - name: Start the traefik container
       ansible.builtin.command: systemctl --user restart traefik.service
+
+    - name: Start the traefik container
+      ansible.builtin.command: systemctl --user restart auth-redis.service
+
+    - name: Start the traefik container
+      ansible.builtin.command: systemctl --user restart auth-server.service
+
+    - name: Start the traefik container
+      ansible.builtin.command: systemctl --user restart auth-worker.service

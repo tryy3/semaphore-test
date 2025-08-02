@@ -37,6 +37,7 @@
       ansible.builtin.apt:
         name: wireguard
         state: present
+    # Install nfs-common, open-iscsi, cryptsetup
       
     - name: Create flannel folder
       ansible.builtin.file:
