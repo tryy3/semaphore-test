@@ -117,3 +117,6 @@
 
     - name: Start the Auth Worker container
       ansible.builtin.command: systemctl --user restart auth-worker.service
+
+    - name: Start the Traefik Redis container
+      ansible.builtin.command: systemctl --user restart traefik-redis.service
