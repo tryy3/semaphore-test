@@ -1,0 +1,16 @@
+---
+- name: Download the backup binary from gitea
+  ansible.builtin.get_url:
+    url: https://gitea.tryy3.dev/tryy3/backup-restic/releases/download/{{ backup_version }}/backup-restic_Linux_x86_64.tar.gz
+    dest: /tmp/backup-restic.tar.gz
+    
+- name: Extract the backup binary
+  ansible.builtin.unarchive:
+    src: /tmp/backup-restic.tar.gz
+    remote_src: true
+    dest: /usr/local/bin
+
+- name: Make the backup binary executable
+  ansible.builtin.file:
+    path: /usr/local/bin/backup-restic
+    mode: '0755'

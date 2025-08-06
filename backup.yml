@@ -1,0 +1,7 @@
+---
+- name: Setup prerequisites for backup
+  hosts: backup
+  vars:
+    backup_version: v0.1.1
+  roles:
+    - backup_preq

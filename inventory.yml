@@ -8,7 +8,14 @@ all:
       ansible_host: 192.168.1.11
       ansible_hostname: VM-KUBE-AGENT-01
       ansible_user: tryy3
+    tower:
+      ansible_host: 192.168.1.138
+      ansible_hostname: tower
+      ansible_user: root
     
+backup:
+  hosts:
+    tower:
 
 setup_vm:
   #hosts: 
